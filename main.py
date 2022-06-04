@@ -5,24 +5,40 @@ from dash.dependencies import Output, Input
 from dash import dash_table
 import yfinance as yf
 import sqlite3
+import datetime as dt
 
 conn = sqlite3.connect('C:/Users/Chris/PycharmProjects/Dash-Project/option_data.db', check_same_thread=False)
+
 
 ticker = pd.read_sql_query('SELECT distinct act_symbol FROM option_chain', con=conn)
 expiration_date = pd.read_sql_query('SELECT distinct expiration FROM option_chain', con=conn)
 call_put = ['Call', 'Put']
 strike = pd.read_sql_query('SELECT distinct strike FROM option_chain', con=conn)
 
-nasdaq_listed_url = "ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt"
-nasdaq_listed_data = pd.read_csv(nasdaq_listed_url,  delimiter="|")
-nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Test Issue"] == "N"]
-nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Financial Status"] == "N"]
-nasdaq_listed_symbols = nasdaq_listed_data['Symbol'].drop(nasdaq_listed_data.iloc[-1:, :].index, axis=0)
-tickers = nasdaq_listed_symbols.to_list()
+#nasdaq_listed_url = "ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt"
+#nasdaq_listed_data = pd.read_csv(nasdaq_listed_url,  delimiter="|")
+#nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Test Issue"] == "N"]
+#nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Financial Status"] == "N"]
+#nasdaq_listed_symbols = nasdaq_listed_data['Symbol'].drop(nasdaq_listed_data.iloc[-1:, :].index, axis=0)
+#tickers = nasdaq_listed_symbols.to_list()
 
-msft = yf.Ticker("AAPL")
-df = pd.DataFrame({'Parameter': msft.info.keys(), 'Value': msft.info.values()})
+#msft = yf.Ticker("AAPL")
+#df = pd.DataFrame({'Parameter': msft.info.keys(), 'Value': msft.info.values()})
+symbol = '\'' + "AAPL" + '\''
+expiration = '\'' + "2022-05-20" + '\''
+call_put = '\'' + "Put" + '\''
 
+select_data = pd.read_sql_query(
+    'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration +
+    ' AND call_put=' + call_put,
+    con=conn)
+
+select_data.date = pd.to_datetime(select_data.date)
+select_data.expiration = pd.to_datetime(select_data.expiration)
+year = dt.datetime(2022, 5, 1)
+example_df = select_data.loc[
+    (select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
+print(example_df)
 
 app = Dash(__name__)
 
@@ -40,12 +56,8 @@ app.layout = html.Div([
                                   for x in ticker.act_symbol],
                          ),
     dcc.Graph(id="graph"),
-    html.Div([
-    dash_table.DataTable(
-        columns=[{"name": i, "id": i} for i in df.columns],
-        data=df.to_dict('records'),
-    )
-    ], id='table'),
+
+    dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns], id='tbl'),
 
     html.Br(),
 
@@ -64,7 +76,7 @@ app.layout = html.Div([
                              )], style=dict(width='50%')),
 
             html.Div(className='three columns', children=[
-                dcc.Dropdown(id='strike', multi=False, value=110.0,
+                dcc.Dropdown(id='strike', multi=False, value=165.0,
                              options=[{'label': x, 'value': x}
                                       for x in strike.strike],
                              )], style=dict(width='50%')),
@@ -80,7 +92,6 @@ app.layout = html.Div([
 # Connect the Plotly graphs with Dash Components
 @app.callback(
     Output('graph', 'figure'),
-    Output('table', 'children'),
     [Input('my-dpdn', 'value'),
      Input('toggle-rangeslider', 'value')]
 )
@@ -90,7 +101,8 @@ def display_candlestick(ticker, value):
     stock = yf.Ticker(input_value)
     hist = stock.history(period="max")
     hist = hist.reset_index(drop=False)
-    info_df = pd.DataFrame({'Parameter': stock.info.keys(), 'Value': stock.info.values()})
+    #info_df = pd.DataFrame({'Parameter': stock.info.keys(), 'Value': stock.info.values()})
+    #df = data[data.act_symbol==ticker]
 
     fig = go.Figure(go.Candlestick(
         x=hist['Date'],
@@ -104,13 +116,37 @@ def display_candlestick(ticker, value):
         xaxis_rangeslider_visible='slider' in value
     )
 
-    table = html.Div([
-    dash_table.DataTable(
-        columns=[{"name": i, "id": i} for i in info_df.columns],
-        data=info_df.to_dict('records'),
-    )], id='table')
+    return fig
 
-    return fig, table
+@app.callback(
+    Output('tbl', 'children'),
+    [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
+     Input('call_put', 'value'), Input('strike', 'value')]
+)
+
+def display_table(ticker, expiration_date, strike, call_put):
+
+    #year = dt.datetime(2022, 5, 1)
+    #df = data.loc[(data["act_symbol"]==ticker) & (data["expiration"] >year) &
+    #                           (data["date"]==data.date.unique()[-1]),]
+
+    symbol = '\'' + str(ticker) + '\''
+    expiration = '\'' + str(expiration_date) + '\''
+    call_put = '\'' + str(call_put) + '\''
+    #strike = '\'' + str(strike) + '\''
+
+    select_data = pd.read_sql_query(
+        'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration +
+        ' AND call_put=' + call_put,
+        con=conn)
+
+    select_data.date = pd.to_datetime(select_data.date)
+    select_data.expiration = pd.to_datetime(select_data.expiration)
+    year = dt.datetime(2022, 5, 1)
+    example_df = select_data.loc[(select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
+    print(example_df)
+
+    return dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns], id='tbl')
 
 @app.callback(
     Output('graph_2', 'figure'),
