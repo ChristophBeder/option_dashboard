@@ -20,7 +20,7 @@ nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Financial Status
 nasdaq_listed_symbols = nasdaq_listed_data['Symbol'].drop(nasdaq_listed_data.iloc[-1:, :].index, axis=0)
 tickers = nasdaq_listed_symbols.to_list()
 
-msft = yf.Ticker("A")
+msft = yf.Ticker("AAPL")
 df = pd.DataFrame({'Parameter': msft.info.keys(), 'Value': msft.info.values()})
 
 
@@ -35,9 +35,9 @@ app.layout = html.Div([
                   'value': 'slider'}],
         value=['slider']
     ),
-    dcc.Dropdown(id='my-dpdn', multi=False, value='A',
+    dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
                          options=[{'label':x, 'value':x}
-                                  for x in tickers],
+                                  for x in ticker.act_symbol],
                          ),
     dcc.Graph(id="graph"),
     html.Div([
@@ -51,11 +51,6 @@ app.layout = html.Div([
 
     html.Div(
         className="row", children=[
-            html.Div(className='three columns', children=[
-                dcc.Dropdown(id='ticker', multi=False, value='A',
-                             options=[{'label': x, 'value': x}
-                                      for x in ticker.act_symbol],
-                             )],style=dict(width='50%')),
             html.Div(className='three columns', children=[
                 dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
                              options=[{'label': x, 'value': x}
@@ -74,7 +69,7 @@ app.layout = html.Div([
                                       for x in strike.strike],
                              )], style=dict(width='50%')),
 
-    ],  style=dict(display='flex')),
+    ],  style=dict(display='flex'), id="option_settings"),
 
     dcc.Graph(id="graph_2")
 
@@ -119,7 +114,7 @@ def display_candlestick(ticker, value):
 
 @app.callback(
     Output('graph_2', 'figure'),
-    [Input('ticker', 'value'), Input('expiration_date', 'value'),
+    [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
      Input('call_put', 'value'), Input('strike', 'value')]
 )
 def display_candlestick(ticker, expiration_date, call_put, strike):
@@ -142,6 +137,44 @@ def display_candlestick(ticker, expiration_date, call_put, strike):
 
     )
     return fig
+
+@app.callback(
+    Output('option_settings', 'children'),
+    [Input('my-dpdn', 'value')]
+)
+
+def display_dropdown(ticker):
+    symbol = '\'' + str(ticker) + '\''
+    call_put = ['Call', 'Put']
+
+    select_data = pd.read_sql_query(
+        'SELECT * FROM option_chain WHERE act_symbol=' + symbol,
+        con=conn)
+
+    result = html.Div(
+        className="row", children=[
+            html.Div(className='three columns', children=[
+                dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
+                             options=[{'label': x, 'value': x}
+                                      for x in select_data.expiration],
+                             )], style=dict(width='50%')),
+
+            html.Div(className='three columns', children=[
+                dcc.Dropdown(id='call_put', multi=False, value='Put',
+                             options=[{'label': x, 'value': x}
+                                      for x in call_put],
+                             )], style=dict(width='50%')),
+
+            html.Div(className='three columns', children=[
+                dcc.Dropdown(id='strike', multi=False, value=110.0,
+                             options=[{'label': x, 'value': x}
+                                      for x in select_data.strike],
+                             )], style=dict(width='50%')),
+
+    ],  style=dict(display='flex'), id="option_settings"),
+
+    return result
+
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
     app.run_server(debug=True)
