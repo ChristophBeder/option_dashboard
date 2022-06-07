@@ -4,7 +4,7 @@ from dash import Dash, dcc, html
 from dash.dependencies import Output, Input
 import dash_bootstrap_components as dbc
 from dash import dash_table
-import yfinance as yf
+import plotly
 import sqlite3
 import datetime as dt
 
@@ -38,43 +38,61 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 # ------------------------------------------------------------------------------
 # App layout
 app.layout = html.Div([
-    dcc.Checklist(
-        id='toggle-rangeslider',
-        options=[{'label': 'Include Rangeslider',
-                  'value': 'slider'}],
-        value=['slider']
-    ),
-    dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
-                         options=[{'label':x, 'value':x}
-                                  for x in ticker.act_symbol],
-                         ),
-    dcc.Graph(id="graph"),
-
-    dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns], id='tbl'),
 
     html.Br(),
 
     html.Div(
+        dcc.Checklist(
+            id='toggle-rangeslider',
+            options=[{'label': 'Include Rangeslider',
+                      'value': 'slider'}],
+            value=['slider']
+        ), style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
+    ),
+
+
+    html.Div(
+        dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
+                     options=[{'label': x, 'value': x}
+                              for x in ticker.act_symbol],
+                     ) , style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
+    ),
+
+    html.Div(
+        dcc.Graph(id="graph"),
+        style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
+    ),
+
+    html.Br(),
+
+    html.Div(
+    dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns]), id='tbl',
+        style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}),
+
+    html.Br(),
+    html.Br(),
+
+    html.Div(
         className="row", children=[
-            html.Div(className='three columns', children=[
+            html.Div(className='one columns', children=[
                 dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
                              options=[{'label': x, 'value': x}
                                       for x in expiration_date.expiration],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
-            html.Div(className='three columns', children=[
+            html.Div(className='one columns', children=[
                 dcc.Dropdown(id='call_put', multi=False, value='Put',
                              options=[{'label': x, 'value': x}
                                       for x in call_put],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
-            html.Div(className='three columns', children=[
+            html.Div(className='one columns', children=[
                 dcc.Dropdown(id='strike', multi=False, value=165.0,
                              options=[{'label': x, 'value': x}
                                       for x in strike.strike],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
-    ],  style=dict(display='flex'), id="option_settings"),
+    ],  style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}, id="option_settings"),
 
     dcc.Graph(id="graph_2")
 
@@ -100,37 +118,71 @@ def display_candlestick(ticker, value):
         high=fig_data['high'],
         low=fig_data['low'],
         close=fig_data['close']
-    ))
-
+    )
+    )
     fig.update_layout(
         xaxis_rangeslider_visible='slider' in value
+    )
+    fig.update_layout(
+        xaxis=dict(
+            showline=True,
+            showgrid=True,
+            showticklabels=True,
+            linecolor='rgb(204, 204, 204)',
+            linewidth=2,
+            ticks='outside',
+            tickfont=dict(
+                family='Arial',
+                size=12,
+                color='rgb(82, 82, 82)',
+            ),
+        ),
+        yaxis=dict(
+            showgrid=True,
+            zeroline=False,
+            showline=True,
+            showticklabels=False,
+        ),
+        autosize=True,
+        margin=dict(
+            autoexpand=True,
+            l=10,
+            r=10,
+            t=10,
+        ),
+        showlegend=False,
+        plot_bgcolor='white'
     )
 
     return fig
 
 @app.callback(
     Output('tbl', 'children'),
-    [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
-     Input('call_put', 'value')]
+    [Input('my-dpdn', 'value'), Input('call_put', 'value')]
 )
 
-def display_table(ticker, expiration_date, call_put):
+def display_table(ticker, call_put):
 
     symbol = '\'' + str(ticker) + '\''
-    expiration = '\'' + str(expiration_date) + '\''
     call_put = '\'' + str(call_put) + '\''
 
     select_data = pd.read_sql_query(
-        'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration +
-        ' AND call_put=' + call_put,
+        'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND call_put=' + call_put,
         con=conn)
 
     select_data.date = pd.to_datetime(select_data.date)
     select_data.expiration = pd.to_datetime(select_data.expiration)
     year = dt.datetime(2022, 5, 1)
     example_df = select_data.loc[(select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
+    example_df["date"] = example_df["date"].dt.strftime('%Y.%m.%d')
+    example_df["expiration"] = example_df["expiration"].dt.strftime('%Y.%m.%d')
 
-    return dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns], id='tbl')
+    table = html.Div(
+        dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns]),
+                             id='tbl'
+    )
+
+    return table
 
 @app.callback(
     Output('graph_2', 'figure'),
@@ -153,6 +205,37 @@ def display_candlestick(ticker, expiration_date, call_put, strike):
         data=[go.Scatter(x=select_data.date, y=select_data.ask)]
 
     )
+
+    fig.update_layout(
+        xaxis=dict(
+            showline=True,
+            showgrid=False,
+            showticklabels=True,
+            linecolor='rgb(204, 204, 204)',
+            linewidth=2,
+            ticks='outside',
+            tickfont=dict(
+                family='Arial',
+                size=12,
+                color='rgb(82, 82, 82)',
+            ),
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            showticklabels=False,
+        ),
+        autosize=False,
+        margin=dict(
+            autoexpand=False,
+            l=100,
+            r=20,
+            t=110,
+        ),
+        showlegend=False,
+        plot_bgcolor='white'
+    )
     return fig
 
 @app.callback(
@@ -174,21 +257,21 @@ def display_dropdown(ticker):
                 dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
                              options=[{'label': x, 'value': x}
                                       for x in select_data.expiration],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
             html.Div(className='three columns', children=[
                 dcc.Dropdown(id='call_put', multi=False, value='Put',
                              options=[{'label': x, 'value': x}
                                       for x in call_put],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
             html.Div(className='three columns', children=[
                 dcc.Dropdown(id='strike', multi=False, value=110.0,
                              options=[{'label': x, 'value': x}
                                       for x in select_data.strike],
-                             )], style=dict(width='50%')),
+                             )], style=dict(width='33%')),
 
-    ],  style=dict(display='flex'), id="option_settings"),
+    ],  style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}, id="option_settings"),
 
     return result
 
