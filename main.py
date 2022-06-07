@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.dependencies import Output, Input
+import dash_bootstrap_components as dbc
 from dash import dash_table
 import yfinance as yf
 import sqlite3
@@ -14,16 +15,9 @@ ticker = pd.read_sql_query('SELECT distinct act_symbol FROM option_chain', con=c
 expiration_date = pd.read_sql_query('SELECT distinct expiration FROM option_chain', con=conn)
 call_put = ['Call', 'Put']
 strike = pd.read_sql_query('SELECT distinct strike FROM option_chain', con=conn)
+stock_prices = pd.read_csv("stock_prices.csv")
 
-#nasdaq_listed_url = "ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt"
-#nasdaq_listed_data = pd.read_csv(nasdaq_listed_url,  delimiter="|")
-#nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Test Issue"] == "N"]
-#nasdaq_listed_data = nasdaq_listed_data.loc[nasdaq_listed_data["Financial Status"] == "N"]
-#nasdaq_listed_symbols = nasdaq_listed_data['Symbol'].drop(nasdaq_listed_data.iloc[-1:, :].index, axis=0)
-#tickers = nasdaq_listed_symbols.to_list()
 
-#msft = yf.Ticker("AAPL")
-#df = pd.DataFrame({'Parameter': msft.info.keys(), 'Value': msft.info.values()})
 symbol = '\'' + "AAPL" + '\''
 expiration = '\'' + "2022-05-20" + '\''
 call_put = '\'' + "Put" + '\''
@@ -38,9 +32,8 @@ select_data.expiration = pd.to_datetime(select_data.expiration)
 year = dt.datetime(2022, 5, 1)
 example_df = select_data.loc[
     (select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
-print(example_df)
 
-app = Dash(__name__)
+app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # ------------------------------------------------------------------------------
 # App layout
@@ -97,19 +90,16 @@ app.layout = html.Div([
 )
 def display_candlestick(ticker, value):
 
-    input_value = ticker
-    stock = yf.Ticker(input_value)
-    hist = stock.history(period="max")
-    hist = hist.reset_index(drop=False)
-    #info_df = pd.DataFrame({'Parameter': stock.info.keys(), 'Value': stock.info.values()})
-    #df = data[data.act_symbol==ticker]
+
+    fig_data = stock_prices.loc[stock_prices["act_symbol"] == str(ticker), ]
+    fig_data = fig_data.reset_index(drop=False)
 
     fig = go.Figure(go.Candlestick(
-        x=hist['Date'],
-        open=hist['Open'],
-        high=hist['High'],
-        low=hist['Low'],
-        close=hist['Close']
+        x=fig_data['date'],
+        open=fig_data['open'],
+        high=fig_data['high'],
+        low=fig_data['low'],
+        close=fig_data['close']
     ))
 
     fig.update_layout(
@@ -121,19 +111,14 @@ def display_candlestick(ticker, value):
 @app.callback(
     Output('tbl', 'children'),
     [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
-     Input('call_put', 'value'), Input('strike', 'value')]
+     Input('call_put', 'value')]
 )
 
-def display_table(ticker, expiration_date, strike, call_put):
-
-    #year = dt.datetime(2022, 5, 1)
-    #df = data.loc[(data["act_symbol"]==ticker) & (data["expiration"] >year) &
-    #                           (data["date"]==data.date.unique()[-1]),]
+def display_table(ticker, expiration_date, call_put):
 
     symbol = '\'' + str(ticker) + '\''
     expiration = '\'' + str(expiration_date) + '\''
     call_put = '\'' + str(call_put) + '\''
-    #strike = '\'' + str(strike) + '\''
 
     select_data = pd.read_sql_query(
         'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration +
@@ -144,7 +129,6 @@ def display_table(ticker, expiration_date, strike, call_put):
     select_data.expiration = pd.to_datetime(select_data.expiration)
     year = dt.datetime(2022, 5, 1)
     example_df = select_data.loc[(select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
-    print(example_df)
 
     return dash_table.DataTable(example_df.to_dict('records'), [{"name": i, "id": i} for i in example_df.columns], id='tbl')
 
@@ -155,9 +139,6 @@ def display_table(ticker, expiration_date, strike, call_put):
 )
 def display_candlestick(ticker, expiration_date, call_put, strike):
 
-    #select_data = data.loc[(data.act_symbol == ticker) & (data.expiration == expiration_date)
-    #                       & (data.call_put == call_put) & (data.strike == strike), ]
-    #select_data = pd.read_sql_query('SELECT * FROM option_chain WHERE act_symbol=ticker AND WHERE expiration=expiration_date AND WHERE call_put=call_put AND WHERE strike=strike', con=conn)
     symbol = '\'' + str(ticker) + '\''
     expiration = '\'' + str(expiration_date) + '\''
     call_put = '\'' + str(call_put) + '\''
