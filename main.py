@@ -19,7 +19,6 @@ stock_prices = pd.read_csv("stock_prices.csv")
 
 symbol = '\'' + "AAPL" + '\''
 expiration = '\'' + "2022-05-20" + '\''
-#call_put = '\'' + "Put" + '\''
 
 select_data = pd.read_sql_query(
     'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration,
@@ -38,7 +37,6 @@ call_data.columns = ['c_strike', 'c_bid', 'c_ask', 'c_vol', 'c_delta', 'c_gamma'
 put_data = example_df.loc[example_df["call_put"]=="Put", data_cols].reset_index(drop=True)
 put_data.columns = ['p_strike', 'p_bid', 'p_ask', 'p_vol', 'p_delta', 'p_gamma', 'p_theta', 'p_vega', 'p_rho', "p_call_put"]
 all_data = pd.concat([call_data, put_data], axis=1)
-print(all_data)
 
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -191,8 +189,6 @@ def display_table(ticker):
     put_data.columns = ['p_strike', 'p_bid', 'p_ask', 'p_vol', 'p_delta', 'p_gamma', 'p_theta', 'p_vega', 'p_rho',
                         "p_call_put"]
     all_data = pd.concat([call_data, put_data], axis=1)
-    print(all_data)
-    print(pd.DataFrame(all_data.to_dict('records')))
 
     table = html.Div(
         dash_table.DataTable(all_data.to_dict('records'), [{"name": i, "id": i} for i in all_data.columns]),
