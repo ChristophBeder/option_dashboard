@@ -100,7 +100,11 @@ app.layout = html.Div([
 
     ],  style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}, id="option_settings"),
 
-    dcc.Graph(id="graph_2")
+    dcc.Graph(id="graph_2"),
+
+    html.Br(),
+
+    dcc.Graph(id="graph_3")
 
 ])
 
@@ -250,6 +254,69 @@ def display_candlestick(ticker, expiration_date, call_put, strike):
         plot_bgcolor='white'
     )
     return fig
+
+@app.callback(
+    Output('graph_3', 'figure'),
+    [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
+     Input('call_put', 'value'), Input('strike', 'value')]
+)
+def display_candlestick(ticker, expiration_date, call_put, strike):
+
+    symbol = '\'' + str(ticker) + '\''
+    expiration = '\'' + str(expiration_date) + '\''
+    call_put = '\'' + str(call_put) + '\''
+    strike = '\'' + str(strike) + '\''
+
+
+    select_data = pd.read_sql_query(
+        'SELECT * FROM option_chain WHERE act_symbol=' + symbol +
+        ' AND call_put=' + call_put,
+        con=conn)
+
+    example_df = select_data.loc[(select_data["date"] == select_data.date.unique()[-1]),]
+
+    #fig = go.Figure(
+    #    data=[go.Scatter(x=example_df.strike, y=example_df.ask)])
+
+    fig = go.Figure(data=[go.Mesh3d(x=example_df.strike,
+                                    y=example_df.expiration,
+                                    z=example_df.ask,
+                                    opacity=0.5,
+                                    color='rgba(244,22,100,0.6)'
+                                    )])
+
+    fig.update_layout(
+        xaxis=dict(
+            showline=True,
+            showgrid=False,
+            showticklabels=True,
+            linecolor='rgb(204, 204, 204)',
+            linewidth=2,
+            ticks='outside',
+            tickfont=dict(
+                family='Arial',
+                size=12,
+                color='rgb(82, 82, 82)',
+            ),
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            showticklabels=False,
+        ),
+        autosize=False,
+        margin=dict(
+            autoexpand=False,
+            l=100,
+            r=20,
+            t=110,
+        ),
+        showlegend=False,
+        plot_bgcolor='white'
+    )
+    return fig
+
 
 @app.callback(
     Output('option_settings', 'children'),
