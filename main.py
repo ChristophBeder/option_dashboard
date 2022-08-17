@@ -70,7 +70,6 @@ app.layout = html.Div([
     ),
 
     html.Br(),
-
     html.Div(
     dash_table.DataTable(all_data.to_dict('records'), [{"name": i, "id": i} for i in all_data.columns]), id='tbl',
         style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}),
@@ -183,7 +182,7 @@ def display_table(ticker):
     select_data.date = pd.to_datetime(select_data.date)
     select_data.expiration = pd.to_datetime(select_data.expiration)
     year = dt.datetime(2022, 5, 1)
-    example_df = select_data.loc[(select_data["expiration"] > year) & (select_data["date"] == select_data.date.unique()[-1]),]
+    example_df = select_data.loc[(select_data["expiration"] == select_data.expiration.unique()[-1]) & (select_data["date"] == select_data.date.unique()[-1]),]
     example_df["date"] = example_df["date"].dt.strftime('%Y.%m.%d')
     example_df["expiration"] = example_df["expiration"].dt.strftime('%Y.%m.%d')
     call_data = example_df.loc[example_df["call_put"] == "Call", data_cols].reset_index(drop=True)
@@ -193,9 +192,12 @@ def display_table(ticker):
     put_data.columns = ['p_strike', 'p_bid', 'p_ask', 'p_vol', 'p_delta', 'p_gamma', 'p_theta', 'p_vega', 'p_rho',
                         "p_call_put"]
     all_data = pd.concat([call_data, put_data], axis=1)
+    all_data = all_data.round(decimals=3)
 
     table = html.Div(
-        dash_table.DataTable(all_data.to_dict('records'), [{"name": i, "id": i} for i in all_data.columns]),
+        dash_table.DataTable(all_data.to_dict('records'), [{"name": i, "id": i} for i in all_data.columns],
+                             style_cell={"textAlign": "center"},
+                             style_header={'backgroundColor': '#6cb1ff', 'fontWeight': 'bold'}),
                              id='tbl'
     )
 
