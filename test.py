@@ -1,22 +1,27 @@
-import yfinance as yf
 import pandas as pd
 import datetime as dt
 
-#msft = yf.Ticker("MSFT")
-#print(msft.info.keys())
-#df = pd.DataFrame({'Parameter': msft.info.keys(), 'Value': msft.info.values()})
-#
-#keys and values
-#print(df)
-#print(msft.options)
-#print(msft.option_chain('2022-01-21')[0])
+#import requests
+#owner, repo, branch = 'post-no-preference', 'options', 'master'
+#query = '''SELECT * FROM `option_chain` ORDER BY `date` ASC, `act_symbol` ASC, `expiration` ASC, `strike` ASC, `call_put` ASC LIMIT 200; '''
+#res = requests.get('https://www.dolthub.com/api/v1alpha1/{}/{}/{}'.format(owner, repo, branch), params={'q': query})
+#print(res.json())
+#data = res.json()
+#print(pd.DataFrame(data["rows"]))
 
-data = pd.read_csv("option_chain.csv")
-data.expiration = pd.to_datetime(data.expiration)
-data.date = pd.to_datetime(data.date)
-year = dt.datetime(2022, 5, 1)
-print(year)
 
-example_df = data.loc[(data["act_symbol"]=="AAPL") & (data["expiration"] >year) & (data["date"]==data.date.unique()[-1]),]
-print(example_df)
-#print(example_df.date.unique()[-1])
+# Rewrite csv to parquet
+#df = pd.read_csv('volatility_history.csv')
+#df.to_parquet('volatility_history.parquet')
+#option_chain = pd.read_parquet("option_chain.parquet")
+#print(option_chain.expiration.unique())
+
+
+
+
+# Manually download file
+#import requests
+#local_file = 'option_test.csv'
+#res = requests.get('https://www.dolthub.com/csv/post-no-preference/options/1brvscel97j3tef5mkrfticvp7ebks2c/option_chain')
+#with open(local_file, 'wb') as file:
+#  file.write(res.content)

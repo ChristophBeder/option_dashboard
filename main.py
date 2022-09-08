@@ -4,25 +4,20 @@ from dash import Dash, dcc, html
 from dash.dependencies import Output, Input
 import dash_bootstrap_components as dbc
 from dash import dash_table
-import sqlite3
 import datetime as dt
 
-conn = sqlite3.connect('C:/Users/Chris/PycharmProjects/Dash-Project/option_data.db', check_same_thread=False)
+option_chain = pd.read_parquet("option_chain.parquet")
 
-
-ticker = pd.read_sql_query('SELECT distinct act_symbol FROM option_chain', con=conn)
-expiration_date = pd.read_sql_query('SELECT distinct expiration FROM option_chain', con=conn)
+ticker = option_chain.act_symbol.unique()
+expiration_date = option_chain.expiration.unique()
 call_put = ['Call', 'Put']
-strike = pd.read_sql_query('SELECT distinct strike FROM option_chain', con=conn)
+strike = option_chain.strike.unique()
 stock_prices = pd.read_csv("stock_prices.csv")
 
+symbol = "AAPL"
+expiration = "2022-05-20"
 
-symbol = '\'' + "AAPL" + '\''
-expiration = '\'' + "2022-05-20" + '\''
-
-select_data = pd.read_sql_query(
-    'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration,
-    con=conn)
+select_data = option_chain[(option_chain.act_symbol==symbol) & (option_chain.expiration==expiration)]
 
 select_data.date = pd.to_datetime(select_data.date)
 select_data.expiration = pd.to_datetime(select_data.expiration)
@@ -60,7 +55,7 @@ app.layout = html.Div([
     html.Div(
         dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
                      options=[{'label': x, 'value': x}
-                              for x in ticker.act_symbol],
+                              for x in ticker],
                      ) , style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
     ),
 
@@ -82,7 +77,7 @@ app.layout = html.Div([
             html.Div(className='one columns', children=[
                 dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
                              options=[{'label': x, 'value': x}
-                                      for x in expiration_date.expiration],
+                                      for x in expiration_date],
                              )], style=dict(width='33%')),
 
             html.Div(className='one columns', children=[
@@ -94,7 +89,7 @@ app.layout = html.Div([
             html.Div(className='one columns', children=[
                 dcc.Dropdown(id='strike', multi=False, value=165.0,
                              options=[{'label': x, 'value': x}
-                                      for x in strike.strike],
+                                      for x in strike],
                              )], style=dict(width='33%')),
 
     ],  style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}, id="option_settings"),
@@ -172,16 +167,10 @@ def display_candlestick(ticker, value):
 
 def display_table(ticker):
 
-    symbol = '\'' + str(ticker) + '\''
-    #call_put = '\'' + str(call_put) + '\''
-
-    select_data = pd.read_sql_query(
-        'SELECT * FROM option_chain WHERE act_symbol=' + symbol,
-        con=conn)
+    select_data = option_chain[option_chain.act_symbol==ticker]
 
     select_data.date = pd.to_datetime(select_data.date)
     select_data.expiration = pd.to_datetime(select_data.expiration)
-    year = dt.datetime(2022, 5, 1)
     example_df = select_data.loc[(select_data["expiration"] == select_data.expiration.unique()[-1]) & (select_data["date"] == select_data.date.unique()[-1]),]
     example_df["date"] = example_df["date"].dt.strftime('%Y.%m.%d')
     example_df["expiration"] = example_df["expiration"].dt.strftime('%Y.%m.%d')
@@ -210,16 +199,9 @@ def display_table(ticker):
 )
 def display_candlestick(ticker, expiration_date, call_put, strike):
 
-    symbol = '\'' + str(ticker) + '\''
-    expiration = '\'' + str(expiration_date) + '\''
-    call_put = '\'' + str(call_put) + '\''
-    strike = '\'' + str(strike) + '\''
+    select_data = option_chain[(option_chain.act_symbol==ticker) & (option_chain.expiration==expiration_date)
+                               & (option_chain.call_put==call_put) & (option_chain.strike==strike)]
 
-
-    select_data = pd.read_sql_query(
-        'SELECT * FROM option_chain WHERE act_symbol=' + symbol + ' AND expiration=' + expiration +
-        ' AND call_put=' + call_put + ' AND strike=' + strike,
-        con=conn)
     fig = go.Figure(
         data=[go.Scatter(x=select_data.date, y=select_data.ask)]
 
@@ -259,26 +241,13 @@ def display_candlestick(ticker, expiration_date, call_put, strike):
 
 @app.callback(
     Output('graph_3', 'figure'),
-    [Input('my-dpdn', 'value'), Input('expiration_date', 'value'),
-     Input('call_put', 'value'), Input('strike', 'value')]
+    [Input('my-dpdn', 'value'),
+     Input('call_put', 'value')]
 )
-def display_candlestick(ticker, expiration_date, call_put, strike):
+def display_candlestick(ticker, call_put):
 
-    symbol = '\'' + str(ticker) + '\''
-    expiration = '\'' + str(expiration_date) + '\''
-    call_put = '\'' + str(call_put) + '\''
-    strike = '\'' + str(strike) + '\''
-
-
-    select_data = pd.read_sql_query(
-        'SELECT * FROM option_chain WHERE act_symbol=' + symbol +
-        ' AND call_put=' + call_put,
-        con=conn)
-
+    select_data = option_chain[(option_chain.act_symbol==ticker) & (option_chain.call_put==call_put)]
     example_df = select_data.loc[(select_data["date"] == select_data.date.unique()[-1]),]
-
-    #fig = go.Figure(
-    #    data=[go.Scatter(x=example_df.strike, y=example_df.ask)])
 
     fig = go.Figure(data=[go.Mesh3d(x=example_df.strike,
                                     y=example_df.expiration,
@@ -326,12 +295,9 @@ def display_candlestick(ticker, expiration_date, call_put, strike):
 )
 
 def display_dropdown(ticker):
-    symbol = '\'' + str(ticker) + '\''
-    call_put = ['Call', 'Put']
 
-    select_data = pd.read_sql_query(
-        'SELECT * FROM option_chain WHERE act_symbol=' + symbol,
-        con=conn)
+    call_put = ['Call', 'Put']
+    select_data = option_chain[option_chain.act_symvol==ticker]
 
     result = html.Div(
         className="row", children=[
