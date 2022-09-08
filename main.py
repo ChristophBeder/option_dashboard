@@ -5,15 +5,14 @@ from dash.dependencies import Output, Input
 import dash_bootstrap_components as dbc
 from dash import dash_table
 import datetime as dt
+import yfinance as yf
 
-option_chain = pd.read_parquet("option_chain.parquet")
+option_chain = pd.read_parquet("backend/data/option_chain.parquet")
 
 ticker = option_chain.act_symbol.unique()
 expiration_date = option_chain.expiration.unique()
 call_put = ['Call', 'Put']
 strike = option_chain.strike.unique()
-stock_prices = pd.read_csv("stock_prices.csv")
-
 symbol = "AAPL"
 expiration = "2022-05-20"
 
@@ -112,16 +111,14 @@ app.layout = html.Div([
 )
 def display_candlestick(ticker, value):
 
-
-    fig_data = stock_prices.loc[stock_prices["act_symbol"] == str(ticker), ]
-    fig_data = fig_data.reset_index(drop=False)
+    fig_data = yf.Ticker(ticker).history(period="max").reset_index(level=0)
 
     fig = go.Figure(go.Candlestick(
-        x=fig_data['date'],
-        open=fig_data['open'],
-        high=fig_data['high'],
-        low=fig_data['low'],
-        close=fig_data['close']
+        x=fig_data['Date'],
+        open=fig_data['Open'],
+        high=fig_data['High'],
+        low=fig_data['Low'],
+        close=fig_data['Close']
     )
     )
     fig.update_layout(
