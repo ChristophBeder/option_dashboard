@@ -1,19 +1,20 @@
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, ctx
 from dash.dependencies import Output, Input
 import dash_bootstrap_components as dbc
 from dash import dash_table
 import datetime as dt
 import yfinance as yf
+import numpy as np
 
 option_chain = pd.read_parquet("backend/data/option_chain.parquet")
 
-ticker = option_chain.act_symbol.unique()
-expiration_date = option_chain.expiration.unique()
-call_put = ['Call', 'Put']
-strike = option_chain.strike.unique()
 symbol = "AAPL"
+ticker = option_chain.act_symbol.unique()
+expiration_date = option_chain.loc[option_chain.act_symbol==symbol,"expiration"].unique()
+call_put = ['Call', 'Put']
+strike = np.sort(option_chain.loc[option_chain.act_symbol==symbol,"strike"].unique())
 expiration = "2022-05-20"
 
 select_data = option_chain[(option_chain.act_symbol==symbol) & (option_chain.expiration==expiration)]
@@ -32,7 +33,6 @@ put_data = example_df.loc[example_df["call_put"]=="Put", data_cols].reset_index(
 put_data.columns = ['p_strike', 'p_bid', 'p_ask', 'p_vol', 'p_delta', 'p_gamma', 'p_theta', 'p_vega', 'p_rho', "p_call_put"]
 all_data = pd.concat([call_data, put_data], axis=1)
 
-
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # ------------------------------------------------------------------------------
@@ -42,21 +42,27 @@ app.layout = html.Div([
     html.Br(),
 
     html.Div(
-        dcc.Checklist(
-            id='toggle-rangeslider',
-            options=[{'label': 'Include Rangeslider',
-                      'value': 'slider'}],
-            value=['slider']
-        ), style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
-    ),
+        className="row", children=[
 
+            html.Div(className='one columns', children=[
+                dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
+                             options=[{'label': x, 'value': x}
+                                      for x in ticker],
+                             )], style=dict(width='30%')),
 
-    html.Div(
-        dcc.Dropdown(id='my-dpdn', multi=False, value='AAPL',
-                     options=[{'label': x, 'value': x}
-                              for x in ticker],
-                     ) , style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}
-    ),
+            html.Div(className='three columns', children=[
+
+                dbc.Button('Today', id='btn-nclicks-1', outline=True, color="dark", n_clicks=0),
+                dbc.Button('Week', id='btn-nclicks-2', outline=True, color="dark", n_clicks=0),
+                dbc.Button('Month', id='btn-nclicks-3', outline=True, color="dark", n_clicks=0),
+                dbc.Button('Year', id='btn-nclicks-4', outline=True, color="dark", n_clicks=0),
+                dbc.Button('Full History', id='btn-nclicks-5', outline=True, color="dark", n_clicks=0),
+
+            ], style=dict(width='70%')),
+        ]
+    ,style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}),
+
+    html.Br(),
 
     html.Div(
         dcc.Graph(id="graph"),
@@ -107,11 +113,26 @@ app.layout = html.Div([
 @app.callback(
     Output('graph', 'figure'),
     [Input('my-dpdn', 'value'),
-     Input('toggle-rangeslider', 'value')]
+     Input('btn-nclicks-1', 'n_clicks'),
+     Input('btn-nclicks-2', 'n_clicks'),
+     Input('btn-nclicks-3', 'n_clicks'),
+     Input('btn-nclicks-4', 'n_clicks'),
+     Input('btn-nclicks-5', 'n_clicks')]
 )
-def display_candlestick(ticker, value):
+def display_candlestick(ticker, n_clicks_1, n_clicks_2, n_clicks_3, n_clicks_4, n_clicks_5):
 
-    fig_data = yf.Ticker(ticker).history(period="max").reset_index(level=0)
+    if "btn-nclicks-1" == ctx.triggered_id:
+        fig_data = yf.Ticker(ticker).history(period="1d").reset_index(level=0)
+    elif "btn-nclicks-2" == ctx.triggered_id:
+        fig_data = yf.Ticker(ticker).history(period="5d").reset_index(level=0)
+    elif "btn-nclicks-3" == ctx.triggered_id:
+        fig_data = yf.Ticker(ticker).history(period="1mo").reset_index(level=0)
+    elif "btn-nclicks-4" == ctx.triggered_id:
+        fig_data = yf.Ticker(ticker).history(period="1y").reset_index(level=0)
+    elif "btn-nclicks-5" == ctx.triggered_id:
+        fig_data = yf.Ticker(ticker).history(period="max").reset_index(level=0)
+    else:
+        fig_data = yf.Ticker(ticker).history(period="1y").reset_index(level=0)
 
     fig = go.Figure(go.Candlestick(
         x=fig_data['Date'],
@@ -119,11 +140,10 @@ def display_candlestick(ticker, value):
         high=fig_data['High'],
         low=fig_data['Low'],
         close=fig_data['Close']
+        )
     )
-    )
-    fig.update_layout(
-        xaxis_rangeslider_visible='slider' in value
-    )
+
+    fig.update_layout(xaxis_rangeslider_visible=False)
     fig.update_layout(
         xaxis=dict(
             showline=True,
@@ -294,14 +314,16 @@ def display_candlestick(ticker, call_put):
 def display_dropdown(ticker):
 
     call_put = ['Call', 'Put']
-    select_data = option_chain[option_chain.act_symvol==ticker]
+    expiration_date = option_chain.loc[option_chain.act_symbol == ticker, "expiration"].unique()
+    strike = np.sort(option_chain.loc[option_chain.act_symbol == ticker, "strike"].unique())
+
 
     result = html.Div(
         className="row", children=[
             html.Div(className='three columns', children=[
-                dcc.Dropdown(id='expiration_date', multi=False, value='2022-05-20',
+                dcc.Dropdown(id='expiration_date', multi=False, value=expiration_date[-1],
                              options=[{'label': x, 'value': x}
-                                      for x in select_data.expiration],
+                                      for x in expiration_date],
                              )], style=dict(width='33%')),
 
             html.Div(className='three columns', children=[
@@ -311,9 +333,9 @@ def display_dropdown(ticker):
                              )], style=dict(width='33%')),
 
             html.Div(className='three columns', children=[
-                dcc.Dropdown(id='strike', multi=False, value=110.0,
+                dcc.Dropdown(id='strike', multi=False, value=strike[1],
                              options=[{'label': x, 'value': x}
-                                      for x in select_data.strike],
+                                      for x in strike],
                              )], style=dict(width='33%')),
 
     ],  style={'width': '95%','padding-left':'2.5%', 'padding-right':'2.5%'}, id="option_settings"),
